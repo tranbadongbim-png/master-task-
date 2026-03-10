@@ -94,9 +94,7 @@ export default function App() {
   const [cards, setCards] = useState<Card[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [lastSyncError, setLastSyncError] = useState<string | null>(null);
+  const [users, setUsers] = useState<User[]>(USERS);
   const [activeCardId, setActiveCardId] = useLocalStorage<string | null>('taskmaster_active_card', null);
   const [isDarkMode, setIsDarkMode] = useLocalStorage<boolean>('taskmaster_theme', false);
   
@@ -147,7 +145,9 @@ export default function App() {
         setCards(data.cards || []);
         setTasks(data.tasks || []);
         setSubtasks(data.subtasks || []);
-        setUsers(data.users && data.users.length > 0 ? data.users : USERS);
+        if (data.users && data.users.length > 0) {
+          setUsers(data.users);
+        }
         setIsLoading(false);
         setInitialLoadDone(true);
       })
@@ -169,40 +169,15 @@ export default function App() {
     }
 
     const timeout = setTimeout(() => {
-      setIsSyncing(true);
-      setLastSyncError(null);
       fetch('/api/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cards, tasks, subtasks, users })
-      })
-      .then(res => {
-        if (!res.ok) throw new Error('Sync failed');
-        return res.json();
-      })
-      .then(() => {
-        setIsSyncing(false);
-      })
-      .catch(err => {
-        console.error("Failed to sync data", err);
-        setIsSyncing(false);
-        setLastSyncError("Không thể đồng bộ dữ liệu. Vui lòng kiểm tra kết nối.");
-      });
-    }, 500);
+      }).catch(err => console.error("Failed to sync data", err));
+    }, 1000);
 
     return () => clearTimeout(timeout);
   }, [cards, tasks, subtasks, users, isConfigured, initialLoadDone]);
-
-  useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (isSyncing) {
-        e.preventDefault();
-        e.returnValue = '';
-      }
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [isSyncing]);
 
   const handleAddCard = (e: React.FormEvent) => {
     e.preventDefault();
@@ -576,18 +551,6 @@ export default function App() {
             </h1>
           </div>
           <div className="flex items-center gap-2">
-            {isSyncing && (
-              <div className="flex items-center gap-1.5 px-2 py-1 bg-slate-100 dark:bg-zinc-800 rounded-lg text-[10px] font-bold text-slate-500 animate-pulse">
-                <Clock className="w-3 h-3" />
-                ĐANG LƯU...
-              </div>
-            )}
-            {lastSyncError && (
-              <div className="flex items-center gap-1.5 px-2 py-1 bg-red-50 dark:bg-red-900/20 rounded-lg text-[10px] font-bold text-red-500" title={lastSyncError}>
-                <X className="w-3 h-3" />
-                LỖI ĐỒNG BỘ
-              </div>
-            )}
             <button 
               onClick={() => window.location.reload()}
               className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors text-slate-500 dark:text-slate-400"
@@ -1024,7 +987,7 @@ function AnalyticsView({ cards, tasks, users }: { cards: Card[], tasks: Task[], 
               Trạng thái công việc
             </h3>
             <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+              <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
                     data={overallStats}
@@ -1057,7 +1020,7 @@ function AnalyticsView({ cards, tasks, users }: { cards: Card[], tasks: Task[], 
               Độ ưu tiên
             </h3>
             <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+              <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
                     data={priorityStats}
@@ -1092,7 +1055,7 @@ function AnalyticsView({ cards, tasks, users }: { cards: Card[], tasks: Task[], 
               Tiến độ theo thẻ
             </h3>
             <div className="h-80 w-full">
-              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+              <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={statsByCard} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.5} />
                   <XAxis dataKey="name" fontSize={11} tickLine={false} axisLine={false} tick={{ fill: '#64748b' }} />
@@ -1118,7 +1081,7 @@ function AnalyticsView({ cards, tasks, users }: { cards: Card[], tasks: Task[], 
                 Khối lượng công việc theo thành viên
               </h3>
               <div className="h-80 w-full">
-                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={statsByUser} layout="vertical" margin={{ top: 0, right: 30, left: 40, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" opacity={0.5} />
                     <XAxis type="number" fontSize={11} tickLine={false} axisLine={false} tick={{ fill: '#64748b' }} />
