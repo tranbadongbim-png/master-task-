@@ -1,0 +1,5 @@
+{
+  "name": "TaskMaster",
+  "description": "Ứng dụng quản lý công việc cá nhân với các thẻ, công việc và công việc con. Hỗ trợ Kanban board và chế độ sáng/tối.",
+  "requestFramePermissions": []
+}

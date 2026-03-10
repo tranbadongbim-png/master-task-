@@ -1,0 +1,8 @@
+name = "taskmaster"
+compatibility_date = "2024-03-10"
+pages_build_output_dir = "taskmaster-dist"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "taskmaster-db"
+database_id = "ffa092bc-8878-4c22-86fd-aa43cb01cd27"
