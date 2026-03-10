@@ -82,9 +82,17 @@ export default function App() {
       });
   }, []);
 
+  const isFirstRender = useRef(true);
+
   useEffect(() => {
     if (!isConfigured || !initialLoadDone) return;
     
+    // Prevent syncing the data immediately after loading it
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+
     const timeout = setTimeout(() => {
       fetch('/api/sync', {
         method: 'POST',
