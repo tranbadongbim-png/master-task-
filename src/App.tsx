@@ -3,7 +3,7 @@ import {
   Moon, Sun, Plus, Trash2, Menu, LayoutDashboard, 
   CheckCircle2, Circle, Clock, X, Check, AlignLeft, CheckSquare,
   Search, ArrowUpDown, Settings, ArrowLeft, Flag,
-  ArrowUp, ArrowRight, ArrowDown
+  ArrowUp, ArrowRight, ArrowDown, Edit2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Card, Task, Subtask, TaskStatus, TaskPriority } from './types';
@@ -38,6 +38,8 @@ export default function App() {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [isAddingCard, setIsAddingCard] = useState(false);
   const [newCardTitle, setNewCardTitle] = useState('');
+  const [editingCardId, setEditingCardId] = useState<string | null>(null);
+  const [editingCardTitle, setEditingCardTitle] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'az' | 'za'>('newest');
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
@@ -117,6 +119,16 @@ export default function App() {
     setActiveView('board');
     setNewCardTitle('');
     setIsAddingCard(false);
+  };
+
+  const handleUpdateCard = (e: React.FormEvent, id: string) => {
+    e.preventDefault();
+    if (!editingCardTitle.trim()) {
+      setEditingCardId(null);
+      return;
+    }
+    setCards(cards.map(c => c.id === id ? { ...c, title: editingCardTitle.trim() } : c));
+    setEditingCardId(null);
   };
 
   const handleDeleteCard = (id: string) => {
@@ -246,18 +258,58 @@ export default function App() {
                 key={card.id}
                 className={`group flex items-center justify-between p-3 rounded-xl cursor-pointer transition-colors ${activeCardId === card.id && activeView === 'board' ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300' : 'hover:bg-slate-100 dark:hover:bg-slate-800/50'}`}
                 onClick={() => {
+                  if (editingCardId === card.id) return;
                   setActiveCardId(card.id);
                   setActiveView('board');
                   setIsSidebarOpen(false);
                 }}
+                onDoubleClick={(e) => {
+                  e.stopPropagation();
+                  setEditingCardId(card.id);
+                  setEditingCardTitle(card.title);
+                }}
               >
-                <span className="font-medium truncate pr-2">{card.title}</span>
-                <button 
-                  onClick={(e) => { e.stopPropagation(); handleDeleteCard(card.id); }}
-                  className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-md transition-all"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                {editingCardId === card.id ? (
+                  <form 
+                    onSubmit={(e) => handleUpdateCard(e, card.id)} 
+                    className="flex-1 mr-2"
+                  >
+                    <input
+                      type="text"
+                      autoFocus
+                      value={editingCardTitle}
+                      onChange={(e) => setEditingCardTitle(e.target.value)}
+                      onBlur={(e) => handleUpdateCard(e, card.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-full bg-white dark:bg-zinc-800 border border-indigo-300 dark:border-indigo-500 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </form>
+                ) : (
+                  <span className="font-medium truncate pr-2 flex-1">{card.title}</span>
+                )}
+                
+                {editingCardId !== card.id && (
+                  <div className="flex items-center opacity-0 group-hover:opacity-100 transition-all shrink-0">
+                    <button 
+                      onClick={(e) => { 
+                        e.stopPropagation(); 
+                        setEditingCardId(card.id);
+                        setEditingCardTitle(card.title);
+                      }}
+                      className="p-1.5 text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-md transition-colors"
+                      title="Sửa tên thẻ"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); handleDeleteCard(card.id); }}
+                      className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-md transition-colors"
+                      title="Xóa thẻ"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -404,31 +456,31 @@ export default function App() {
                 <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
                   <button
                     onClick={() => setActiveTab('all')}
-                    className={`whitespace-nowrap px-4 py-2 rounded-xl text-sm font-medium transition-colors flex items-center gap-2 ${activeTab === 'all' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white dark:bg-zinc-900 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-zinc-800 border border-slate-200 dark:border-zinc-800'}`}
+                    title="Tất cả Kanban"
+                    className={`p-2.5 rounded-xl transition-colors flex items-center justify-center ${activeTab === 'all' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white dark:bg-zinc-900 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-zinc-800 border border-slate-200 dark:border-zinc-800'}`}
                   >
                     <LayoutDashboard className="w-4 h-4" />
-                    Tất cả Kanban
                   </button>
                   <button
                     onClick={() => setActiveTab('todo')}
-                    className={`whitespace-nowrap px-4 py-2 rounded-xl text-sm font-medium transition-colors flex items-center gap-2 ${activeTab === 'todo' ? 'bg-slate-600 text-white shadow-sm' : 'bg-white dark:bg-zinc-900 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-zinc-800 border border-slate-200 dark:border-zinc-800'}`}
+                    title="Chưa làm"
+                    className={`p-2.5 rounded-xl transition-colors flex items-center justify-center ${activeTab === 'todo' ? 'bg-slate-600 text-white shadow-sm' : 'bg-white dark:bg-zinc-900 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-zinc-800 border border-slate-200 dark:border-zinc-800'}`}
                   >
                     <Circle className="w-4 h-4" />
-                    Chưa làm
                   </button>
                   <button
                     onClick={() => setActiveTab('in_progress')}
-                    className={`whitespace-nowrap px-4 py-2 rounded-xl text-sm font-medium transition-colors flex items-center gap-2 ${activeTab === 'in_progress' ? 'bg-blue-600 text-white shadow-sm' : 'bg-white dark:bg-zinc-900 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-zinc-800 border border-slate-200 dark:border-zinc-800'}`}
+                    title="Đang làm"
+                    className={`p-2.5 rounded-xl transition-colors flex items-center justify-center ${activeTab === 'in_progress' ? 'bg-blue-600 text-white shadow-sm' : 'bg-white dark:bg-zinc-900 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-zinc-800 border border-slate-200 dark:border-zinc-800'}`}
                   >
                     <Clock className="w-4 h-4" />
-                    Đang làm
                   </button>
                   <button
                     onClick={() => setActiveTab('done')}
-                    className={`whitespace-nowrap px-4 py-2 rounded-xl text-sm font-medium transition-colors flex items-center gap-2 ${activeTab === 'done' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-white dark:bg-zinc-900 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-zinc-800 border border-slate-200 dark:border-zinc-800'}`}
+                    title="Hoàn thành"
+                    className={`p-2.5 rounded-xl transition-colors flex items-center justify-center ${activeTab === 'done' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-white dark:bg-zinc-900 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-zinc-800 border border-slate-200 dark:border-zinc-800'}`}
                   >
                     <CheckCircle2 className="w-4 h-4" />
-                    Hoàn thành
                   </button>
                 </div>
               </div>
@@ -620,7 +672,7 @@ function KanbanColumn({ title, status, icon, tasks, onAddTask, onEditTask, onSta
                 }}
                 onDragEnd={() => setDraggedTaskId(null)}
                 onClick={() => onEditTask(task)}
-                className={`bg-white dark:bg-zinc-950 p-4 rounded-xl shadow-sm border cursor-grab active:cursor-grabbing hover:shadow-md transition-all group relative overflow-hidden ${
+                className={`bg-white dark:bg-zinc-950 p-3 rounded-xl shadow-sm border cursor-grab active:cursor-grabbing hover:shadow-md transition-all group relative overflow-hidden ${
                   draggedTaskId === task.id 
                     ? 'opacity-50 scale-95 border-indigo-300 dark:border-indigo-700 shadow-none' 
                     : task.status === 'in_progress'
@@ -632,13 +684,6 @@ function KanbanColumn({ title, status, icon, tasks, onAddTask, onEditTask, onSta
                   task.priority === 'low' ? 'bg-blue-50/30 dark:bg-blue-900/10' : ''
                 }`}
               >
-                {task.priority && (
-                  <div className={`absolute left-0 top-0 right-0 h-1 ${
-                    task.priority === 'high' ? 'bg-red-500' :
-                    task.priority === 'medium' ? 'bg-amber-500' :
-                    'bg-blue-500'
-                  }`}></div>
-                )}
                 {task.status === 'in_progress' && (
                   <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500"></div>
                 )}
@@ -652,19 +697,32 @@ function KanbanColumn({ title, status, icon, tasks, onAddTask, onEditTask, onSta
                     )}
                     <span className={`leading-tight ${task.status === 'done' ? 'line-through' : ''}`}>{task.title}</span>
                   </h3>
-                  <select
-                    value={task.status}
-                    onChange={(e) => {
-                      e.stopPropagation();
-                      onStatusChange(task.id, e.target.value as TaskStatus);
-                    }}
+                  <div 
+                    className="flex items-center bg-slate-100 dark:bg-zinc-800/80 rounded-md p-0.5 shrink-0" 
                     onClick={(e) => e.stopPropagation()}
-                    className="text-xs bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-slate-300 border-none rounded px-2 py-1 outline-none cursor-pointer hover:bg-slate-200 dark:hover:bg-zinc-700 transition-colors"
                   >
-                    <option value="todo">Chưa làm</option>
-                    <option value="in_progress">Đang làm</option>
-                    <option value="done">Hoàn thành</option>
-                  </select>
+                    <button 
+                      onClick={() => onStatusChange(task.id, 'todo')} 
+                      className={`p-1 rounded transition-all ${task.status === 'todo' ? 'bg-white dark:bg-zinc-700 shadow-sm text-slate-700 dark:text-slate-200' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
+                      title="Chưa làm"
+                    >
+                      <Circle className="w-3.5 h-3.5" />
+                    </button>
+                    <button 
+                      onClick={() => onStatusChange(task.id, 'in_progress')} 
+                      className={`p-1 rounded transition-all ${task.status === 'in_progress' ? 'bg-white dark:bg-zinc-700 shadow-sm text-blue-500' : 'text-slate-400 hover:text-blue-400'}`}
+                      title="Đang làm"
+                    >
+                      <Clock className="w-3.5 h-3.5" />
+                    </button>
+                    <button 
+                      onClick={() => onStatusChange(task.id, 'done')} 
+                      className={`p-1 rounded transition-all ${task.status === 'done' ? 'bg-white dark:bg-zinc-700 shadow-sm text-emerald-500' : 'text-slate-400 hover:text-emerald-400'}`}
+                      title="Hoàn thành"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
                 {task.description && (
                   <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mb-3">
@@ -673,15 +731,17 @@ function KanbanColumn({ title, status, icon, tasks, onAddTask, onEditTask, onSta
                 )}
                 <div className="flex items-center gap-3 mt-auto pt-2">
                   {task.priority && (
-                    <div className={`flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-md ${
-                      task.priority === 'high' ? 'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400' :
-                      task.priority === 'medium' ? 'bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400' :
-                      'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400'
-                    }`}>
+                    <div 
+                      className={`flex items-center justify-center w-5 h-5 rounded-md ${
+                        task.priority === 'high' ? 'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400' :
+                        task.priority === 'medium' ? 'bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400' :
+                        'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400'
+                      }`}
+                      title={task.priority === 'high' ? 'Cao' : task.priority === 'medium' ? 'Trung bình' : 'Thấp'}
+                    >
                       {task.priority === 'high' ? <ArrowUp className="w-3 h-3" /> :
                        task.priority === 'medium' ? <ArrowRight className="w-3 h-3" /> :
                        <ArrowDown className="w-3 h-3" />}
-                      {task.priority === 'high' ? 'Cao' : task.priority === 'medium' ? 'Trung bình' : 'Thấp'}
                     </div>
                   )}
                   {taskSubtasks.length > 0 && (
