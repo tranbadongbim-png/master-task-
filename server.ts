@@ -65,19 +65,30 @@ app.get("/api/data", async (req, res) => {
     await queryD1([
       { sql: "CREATE TABLE IF NOT EXISTS cards (id TEXT PRIMARY KEY, title TEXT, createdAt INTEGER)" },
       { sql: "CREATE TABLE IF NOT EXISTS tasks (id TEXT PRIMARY KEY, cardId TEXT, title TEXT, description TEXT, status TEXT, priority TEXT, createdAt INTEGER)" },
-      { sql: "CREATE TABLE IF NOT EXISTS subtasks (id TEXT PRIMARY KEY, taskId TEXT, title TEXT, isCompleted INTEGER, createdAt INTEGER)" }
+      { sql: "CREATE TABLE IF NOT EXISTS subtasks (id TEXT PRIMARY KEY, taskId TEXT, title TEXT, isCompleted INTEGER, createdAt INTEGER)" },
+      { sql: "CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, name TEXT, avatar TEXT)" }
     ]);
+
+    // Migration: Add dueDate and assigneeId if they don't exist
+    try {
+      await queryD1([{ sql: "ALTER TABLE tasks ADD COLUMN dueDate TEXT" }]);
+    } catch (e) {}
+    try {
+      await queryD1([{ sql: "ALTER TABLE tasks ADD COLUMN assigneeId TEXT" }]);
+    } catch (e) {}
 
     const results = await queryD1([
       { sql: "SELECT * FROM cards" },
       { sql: "SELECT * FROM tasks" },
-      { sql: "SELECT * FROM subtasks" }
+      { sql: "SELECT * FROM subtasks" },
+      { sql: "SELECT * FROM users" }
     ]);
 
     res.json({
       cards: results[0].results || [],
       tasks: results[1].results || [],
-      subtasks: results[2].results.map((s: any) => ({ ...s, isCompleted: Boolean(s.isCompleted) })) || []
+      subtasks: results[2].results.map((s: any) => ({ ...s, isCompleted: Boolean(s.isCompleted) })) || [],
+      users: results[3].results || []
     });
   } catch (error: any) {
     console.error("Error fetching data:", error);
@@ -87,13 +98,14 @@ app.get("/api/data", async (req, res) => {
 
 app.post("/api/sync", async (req, res) => {
   try {
-    const { cards, tasks, subtasks } = req.body;
+    const { cards, tasks, subtasks, users } = req.body;
     
     // Execute DELETEs first to prevent race conditions with INSERTs
     await queryD1([
       { sql: "DELETE FROM cards" },
       { sql: "DELETE FROM tasks" },
-      { sql: "DELETE FROM subtasks" }
+      { sql: "DELETE FROM subtasks" },
+      { sql: "DELETE FROM users" }
     ]);
 
     const queries: { sql: string, params?: any[] }[] = [];
@@ -107,8 +119,8 @@ app.post("/api/sync", async (req, res) => {
 
     for (const t of tasks) {
       queries.push({ 
-        sql: "INSERT OR REPLACE INTO tasks (id, cardId, title, description, status, priority, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)", 
-        params: [t.id, t.cardId, t.title, t.description || '', t.status, t.priority || null, t.createdAt] 
+        sql: "INSERT OR REPLACE INTO tasks (id, cardId, title, description, status, priority, dueDate, assigneeId, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", 
+        params: [t.id, t.cardId, t.title, t.description || '', t.status, t.priority || null, t.dueDate || null, t.assigneeId || null, t.createdAt] 
       });
     }
 
@@ -117,6 +129,15 @@ app.post("/api/sync", async (req, res) => {
         sql: "INSERT OR REPLACE INTO subtasks (id, taskId, title, isCompleted, createdAt) VALUES (?, ?, ?, ?, ?)", 
         params: [s.id, s.taskId, s.title, s.isCompleted ? 1 : 0, s.createdAt] 
       });
+    }
+
+    if (users) {
+      for (const u of users) {
+        queries.push({ 
+          sql: "INSERT OR REPLACE INTO users (id, name, avatar) VALUES (?, ?, ?)", 
+          params: [u.id, u.name, u.avatar] 
+        });
+      }
     }
 
     // Chunk queries to avoid D1 limits (max 100 per request usually)

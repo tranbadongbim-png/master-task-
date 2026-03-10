@@ -3,10 +3,13 @@ import {
   Moon, Sun, Plus, Trash2, Menu, LayoutDashboard, 
   CheckCircle2, Circle, Clock, X, Check, AlignLeft, CheckSquare,
   Search, ArrowUpDown, Settings, ArrowLeft, Flag,
-  ArrowUp, ArrowRight, ArrowDown, Edit2
+  ArrowUp, ArrowRight, ArrowDown, Edit2, Filter, BarChart3, Calendar, User as UserIcon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Card, Task, Subtask, TaskStatus, TaskPriority } from './types';
+import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from 'recharts';
+import { format, isPast, isToday, parseISO, addDays } from 'date-fns';
+import { Card, Task, Subtask, TaskStatus, TaskPriority, User } from './types';
+import { USERS } from './constants';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { polyfill } from "mobile-drag-drop";
 import { scrollBehaviourDragImageTranslateOverride } from "mobile-drag-drop/scroll-behaviour";
@@ -27,6 +30,7 @@ export default function App() {
   const [cards, setCards] = useState<Card[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
+  const [users, setUsers] = useState<User[]>(USERS);
   const [activeCardId, setActiveCardId] = useLocalStorage<string | null>('taskmaster_active_card', null);
   const [isDarkMode, setIsDarkMode] = useLocalStorage<boolean>('taskmaster_theme', false);
   
@@ -42,8 +46,9 @@ export default function App() {
   const [editingCardTitle, setEditingCardTitle] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'az' | 'za'>('newest');
+  const [filterPriority, setFilterPriority] = useState<'all' | TaskPriority>('all');
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
-  const [activeView, setActiveView] = useState<'board' | 'settings'>('board');
+  const [activeView, setActiveView] = useState<'board' | 'settings' | 'analytics'>('board');
   const [activeTab, setActiveTab] = useState<'all' | TaskStatus>('all');
 
   useEffect(() => {
@@ -75,6 +80,9 @@ export default function App() {
         setCards(data.cards || []);
         setTasks(data.tasks || []);
         setSubtasks(data.subtasks || []);
+        if (data.users && data.users.length > 0) {
+          setUsers(data.users);
+        }
         setIsLoading(false);
         setInitialLoadDone(true);
       })
@@ -99,7 +107,7 @@ export default function App() {
       fetch('/api/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cards, tasks, subtasks })
+        body: JSON.stringify({ cards, tasks, subtasks, users })
       }).catch(err => console.error("Failed to sync data", err));
     }, 1000);
 
@@ -167,8 +175,9 @@ export default function App() {
 
   const filteredAndSortedTasks = activeTasks
     .filter(t => 
-      t.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-      t.description.toLowerCase().includes(searchQuery.toLowerCase())
+      (t.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      t.description.toLowerCase().includes(searchQuery.toLowerCase())) &&
+      (filterPriority === 'all' || t.priority === filterPriority)
     )
     .sort((a, b) => {
       if (sortBy === 'newest') return b.createdAt - a.createdAt;
@@ -188,6 +197,26 @@ export default function App() {
       </div>
     );
   }
+
+  const handleAddUser = () => {
+    const newUser: User = {
+      id: generateId(),
+      name: 'Thành viên mới',
+      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${Math.random()}`
+    };
+    setUsers([...users, newUser]);
+  };
+
+  const handleUpdateUser = (id: string, updates: Partial<User>) => {
+    setUsers(users.map(u => u.id === id ? { ...u, ...updates } : u));
+  };
+
+  const handleDeleteUser = (id: string) => {
+    if (confirm('Bạn có chắc chắn muốn xóa thành viên này? Các công việc đã gán cho họ sẽ không còn người thực hiện.')) {
+      setUsers(users.filter(u => u.id !== id));
+      setTasks(tasks.map(t => t.assigneeId === id ? { ...t, assigneeId: undefined } : t));
+    }
+  };
 
   if (isConfigured === false) {
     return (
@@ -339,7 +368,22 @@ export default function App() {
           )}
         </div>
 
-        <div className="p-4 border-t border-slate-200 dark:border-zinc-800 mt-auto">
+        <div className="p-4 border-t border-slate-200 dark:border-zinc-800 mt-auto space-y-1">
+          <button
+            onClick={() => {
+              setActiveView('analytics');
+              setIsSidebarOpen(false);
+            }}
+            className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${
+              activeView === 'analytics' 
+                ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400' 
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50'
+            }`}
+          >
+            <BarChart3 className="w-5 h-5" />
+            <span className="font-medium text-sm">Thống kê</span>
+          </button>
+
           <button
             onClick={() => {
               setActiveView('settings');
@@ -380,7 +424,7 @@ export default function App() {
               </button>
             )}
             <h1 className="font-bold text-lg lg:text-xl truncate">
-              {activeView === 'settings' ? 'Cài đặt' : (activeCard ? activeCard.title : 'Chọn hoặc tạo một thẻ')}
+              {activeView === 'settings' ? 'Cài đặt' : activeView === 'analytics' ? 'Thống kê tiến độ' : (activeCard ? activeCard.title : 'Chọn hoặc tạo một thẻ')}
             </h1>
           </div>
           {activeView !== 'settings' && (
@@ -396,30 +440,98 @@ export default function App() {
         {/* Main Content Area */}
         {activeView === 'settings' ? (
           <div className="flex-1 overflow-y-auto p-4 lg:p-8 bg-slate-50 dark:bg-black">
-            <div className="max-w-3xl mx-auto">
-              <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-6">Cài đặt chung</h2>
+            <div className="max-w-3xl mx-auto space-y-8">
+              <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Cài đặt</h2>
               
-              <div className="bg-white dark:bg-zinc-950 rounded-2xl border border-slate-200 dark:border-zinc-800 overflow-hidden shadow-sm">
-                <div className="p-6 flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
-                      {isDarkMode ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+              <section className="space-y-4">
+                <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Giao diện</h3>
+                <div className="bg-white dark:bg-zinc-950 rounded-2xl border border-slate-200 dark:border-zinc-800 overflow-hidden shadow-sm">
+                  <div className="p-6 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-full bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                        {isDarkMode ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+                      </div>
+                      <div>
+                        <h3 className="text-base font-medium text-slate-900 dark:text-white">Chế độ tối</h3>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Chuyển đổi giữa chế độ sáng và tối</p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="text-base font-medium text-slate-900 dark:text-white">Giao diện</h3>
-                      <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Chuyển đổi giữa chế độ sáng và tối</p>
-                    </div>
+                    <button
+                      onClick={() => setIsDarkMode(!isDarkMode)}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-zinc-900 ${isDarkMode ? 'bg-indigo-500' : 'bg-slate-300 dark:bg-zinc-700'}`}
+                    >
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isDarkMode ? 'translate-x-6' : 'translate-x-1'}`} />
+                    </button>
                   </div>
-                  <button
-                    onClick={() => setIsDarkMode(!isDarkMode)}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-zinc-900 ${isDarkMode ? 'bg-indigo-500' : 'bg-slate-300 dark:bg-zinc-700'}`}
+                </div>
+              </section>
+
+              <section className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Quản lý thành viên</h3>
+                  <button 
+                    onClick={handleAddUser}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors"
                   >
-                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isDarkMode ? 'translate-x-6' : 'translate-x-1'}`} />
+                    <Plus className="w-4 h-4" />
+                    Thêm thành viên
                   </button>
                 </div>
-              </div>
+                
+                <div className="bg-white dark:bg-zinc-950 rounded-2xl border border-slate-200 dark:border-zinc-800 overflow-hidden shadow-sm">
+                  <div className="divide-y divide-slate-100 dark:divide-zinc-800">
+                    {users.map(user => (
+                      <div key={user.id} className="p-4 flex items-center gap-4 group">
+                        <div className="relative">
+                          <img 
+                            src={user.avatar} 
+                            alt={user.name} 
+                            className="w-12 h-12 rounded-full bg-slate-100 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700"
+                            referrerPolicy="no-referrer"
+                          />
+                          <button 
+                            onClick={() => {
+                              const newSeed = Math.random();
+                              handleUpdateUser(user.id, { avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${newSeed}` });
+                            }}
+                            className="absolute -bottom-1 -right-1 p-1 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                            title="Đổi avatar ngẫu nhiên"
+                          >
+                            <Edit2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                        
+                        <div className="flex-1">
+                          <input 
+                            type="text"
+                            value={user.name}
+                            onChange={(e) => handleUpdateUser(user.id, { name: e.target.value })}
+                            className="w-full bg-transparent border-none focus:ring-0 p-0 font-medium text-slate-900 dark:text-white outline-none"
+                            placeholder="Tên thành viên"
+                          />
+                          <div className="text-xs text-slate-500 mt-0.5">ID: {user.id}</div>
+                        </div>
+
+                        <button 
+                          onClick={() => handleDeleteUser(user.id)}
+                          className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      </div>
+                    ))}
+                    {users.length === 0 && (
+                      <div className="p-8 text-center text-slate-500">
+                        Chưa có thành viên nào. Hãy thêm thành viên mới!
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </section>
             </div>
           </div>
+        ) : activeView === 'analytics' ? (
+          <AnalyticsView cards={cards} tasks={tasks} />
         ) : (
           <div className="flex-1 overflow-x-auto overflow-y-hidden p-4 lg:p-8">
             {activeCard ? (
@@ -438,7 +550,19 @@ export default function App() {
                     />
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <ArrowUpDown className="w-4 h-4 text-slate-400 hidden sm:block" />
+                    <Filter className="w-4 h-4 text-slate-400 hidden sm:block" />
+                    <select 
+                      value={filterPriority}
+                      onChange={(e) => setFilterPriority(e.target.value as any)}
+                      className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl px-2 sm:px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer transition-colors"
+                    >
+                      <option value="all">Tất cả độ ưu tiên</option>
+                      <option value="high">Cao</option>
+                      <option value="medium">Trung bình</option>
+                      <option value="low">Thấp</option>
+                    </select>
+
+                    <ArrowUpDown className="w-4 h-4 text-slate-400 hidden sm:block ml-1" />
                     <select 
                       value={sortBy}
                       onChange={(e) => setSortBy(e.target.value as any)}
@@ -498,6 +622,7 @@ export default function App() {
                     subtasks={subtasks}
                     draggedTaskId={draggedTaskId}
                     setDraggedTaskId={setDraggedTaskId}
+                    users={users}
                     isFullWidth={activeTab !== 'all'}
                   />
                 )}
@@ -513,6 +638,7 @@ export default function App() {
                     subtasks={subtasks}
                     draggedTaskId={draggedTaskId}
                     setDraggedTaskId={setDraggedTaskId}
+                    users={users}
                     isFullWidth={activeTab !== 'all'}
                   />
                 )}
@@ -528,6 +654,7 @@ export default function App() {
                     subtasks={subtasks}
                     draggedTaskId={draggedTaskId}
                     setDraggedTaskId={setDraggedTaskId}
+                    users={users}
                     isFullWidth={activeTab !== 'all'}
                   />
                 )}
@@ -567,6 +694,7 @@ export default function App() {
             onDeleteSubtask={(id) => {
               setSubtasks(subtasks.filter(st => st.id !== id));
             }}
+            users={users}
           />
         )}
       </AnimatePresence>
@@ -574,7 +702,133 @@ export default function App() {
   );
 }
 
-function KanbanColumn({ title, status, icon, tasks, onAddTask, onEditTask, onStatusChange, subtasks, draggedTaskId, setDraggedTaskId, isFullWidth }: { 
+function AnalyticsView({ cards, tasks }: { cards: Card[], tasks: Task[] }) {
+  const statsByCard = cards.map(card => {
+    const cardTasks = tasks.filter(t => t.cardId === card.id);
+    const total = cardTasks.length;
+    const done = cardTasks.filter(t => t.status === 'done').length;
+    const inProgress = cardTasks.filter(t => t.status === 'in_progress').length;
+    const todo = cardTasks.filter(t => t.status === 'todo').length;
+    
+    return {
+      name: card.title,
+      total,
+      done,
+      inProgress,
+      todo,
+      completionRate: total > 0 ? Math.round((done / total) * 100) : 0
+    };
+  });
+
+  const overallStats = [
+    { name: 'Chưa làm', value: tasks.filter(t => t.status === 'todo').length, color: '#94a3b8' },
+    { name: 'Đang làm', value: tasks.filter(t => t.status === 'in_progress').length, color: '#3b82f6' },
+    { name: 'Hoàn thành', value: tasks.filter(t => t.status === 'done').length, color: '#10b981' },
+  ].filter(s => s.value > 0);
+
+  const priorityStats = [
+    { name: 'Cao', value: tasks.filter(t => t.priority === 'high').length, color: '#ef4444' },
+    { name: 'Trung bình', value: tasks.filter(t => t.priority === 'medium').length, color: '#f59e0b' },
+    { name: 'Thấp', value: tasks.filter(t => t.priority === 'low').length, color: '#3b82f6' },
+  ].filter(s => s.value > 0);
+
+  return (
+    <div className="flex-1 overflow-y-auto p-4 lg:p-8 bg-slate-50 dark:bg-black">
+      <div className="max-w-6xl mx-auto space-y-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-sm">
+            <h3 className="text-sm font-medium text-slate-500 mb-1">Tổng số thẻ</h3>
+            <p className="text-3xl font-bold">{cards.length}</p>
+          </div>
+          <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-sm">
+            <h3 className="text-sm font-medium text-slate-500 mb-1">Tổng số công việc</h3>
+            <p className="text-3xl font-bold">{tasks.length}</p>
+          </div>
+          <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-sm">
+            <h3 className="text-sm font-medium text-slate-500 mb-1">Tỉ lệ hoàn thành</h3>
+            <p className="text-3xl font-bold">
+              {tasks.length > 0 ? Math.round((tasks.filter(t => t.status === 'done').length / tasks.length) * 100) : 0}%
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-sm">
+            <h3 className="font-semibold mb-6">Trạng thái công việc</h3>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={overallStats}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {overallStats.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-sm">
+            <h3 className="font-semibold mb-6">Độ ưu tiên</h3>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={priorityStats}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {priorityStats.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-sm">
+          <h3 className="font-semibold mb-6">Tiến độ theo thẻ</h3>
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={statsByCard}>
+                <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
+                <YAxis fontSize={12} tickLine={false} axisLine={false} />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#18181b', border: 'none', borderRadius: '8px', color: '#fff' }}
+                  itemStyle={{ color: '#fff' }}
+                />
+                <Legend />
+                <Bar dataKey="todo" name="Chưa làm" stackId="a" fill="#94a3b8" radius={[0, 0, 0, 0]} />
+                <Bar dataKey="inProgress" name="Đang làm" stackId="a" fill="#3b82f6" radius={[0, 0, 0, 0]} />
+                <Bar dataKey="done" name="Hoàn thành" stackId="a" fill="#10b981" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function KanbanColumn({ title, status, icon, tasks, onAddTask, onEditTask, onStatusChange, subtasks, draggedTaskId, setDraggedTaskId, users, isFullWidth }: { 
   title: string, 
   status: TaskStatus, 
   icon: React.ReactNode, 
@@ -585,6 +839,7 @@ function KanbanColumn({ title, status, icon, tasks, onAddTask, onEditTask, onSta
   subtasks: Subtask[],
   draggedTaskId: string | null,
   setDraggedTaskId: (id: string | null) => void,
+  users: User[],
   isFullWidth?: boolean
 }) {
   const [isDragOver, setIsDragOver] = useState(false);
@@ -729,7 +984,7 @@ function KanbanColumn({ title, status, icon, tasks, onAddTask, onEditTask, onSta
                     {task.description}
                   </p>
                 )}
-                <div className="flex items-center gap-3 mt-auto pt-2">
+                <div className="flex items-center gap-3 mt-auto pt-2 border-t border-slate-100 dark:border-zinc-800/50">
                   {task.priority && (
                     <div 
                       className={`flex items-center justify-center w-5 h-5 rounded-md ${
@@ -744,16 +999,40 @@ function KanbanColumn({ title, status, icon, tasks, onAddTask, onEditTask, onSta
                        <ArrowDown className="w-3 h-3" />}
                     </div>
                   )}
+
+                  {task.dueDate && (
+                    <div className={`flex items-center gap-1 text-[10px] font-medium ${
+                      task.status === 'done' ? 'text-slate-400' :
+                      isPast(parseISO(task.dueDate)) && !isToday(parseISO(task.dueDate)) ? 'text-red-500' :
+                      isToday(parseISO(task.dueDate)) ? 'text-amber-500' :
+                      'text-slate-500 dark:text-slate-400'
+                    }`}>
+                      <Calendar className="w-3 h-3" />
+                      {format(parseISO(task.dueDate), 'dd/MM')}
+                    </div>
+                  )}
+
                   {taskSubtasks.length > 0 && (
-                    <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-medium flex-1">
-                      <CheckSquare className="w-3.5 h-3.5" />
+                    <div className="flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                      <CheckSquare className="w-3 h-3" />
                       <span>{completedSubtasks}/{taskSubtasks.length}</span>
-                      <div className="flex-1 h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full ml-2 overflow-hidden">
-                        <div 
-                          className="h-full bg-indigo-500 rounded-full transition-all" 
-                          style={{ width: `${(completedSubtasks / taskSubtasks.length) * 100}%` }}
-                        />
-                      </div>
+                    </div>
+                  )}
+
+                  {task.assigneeId && (
+                    <div className="ml-auto flex -space-x-2">
+                      {(() => {
+                        const user = users.find(u => u.id === task.assigneeId);
+                        return user ? (
+                          <img 
+                            src={user.avatar} 
+                            alt={user.name} 
+                            title={user.name}
+                            className="w-6 h-6 rounded-full border-2 border-white dark:border-zinc-950 bg-slate-100"
+                            referrerPolicy="no-referrer"
+                          />
+                        ) : null;
+                      })()}
                     </div>
                   )}
                 </div>
@@ -779,7 +1058,7 @@ function KanbanColumn({ title, status, icon, tasks, onAddTask, onEditTask, onSta
   );
 }
 
-function TaskModal({ task, onClose, onSave, onDelete, subtasks, onAddSubtask, onUpdateSubtask, onDeleteSubtask }: {
+function TaskModal({ task, onClose, onSave, onDelete, subtasks, onAddSubtask, onUpdateSubtask, onDeleteSubtask, users }: {
   task: Task,
   onClose: () => void,
   onSave: (task: Task) => void,
@@ -788,6 +1067,7 @@ function TaskModal({ task, onClose, onSave, onDelete, subtasks, onAddSubtask, on
   onAddSubtask: (title: string) => void,
   onUpdateSubtask: (id: string, updates: Partial<Subtask>) => void,
   onDeleteSubtask: (id: string) => void,
+  users: User[],
 }) {
   const [editedTask, setEditedTask] = useState(task);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
@@ -967,6 +1247,36 @@ function TaskModal({ task, onClose, onSave, onDelete, subtasks, onAddSubtask, on
                   <option value="low">Thấp</option>
                   <option value="medium">Trung bình</option>
                   <option value="high">Cao</option>
+                </select>
+              </div>
+
+              <div className="space-y-3">
+                <div className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                  <Calendar className="w-4 h-4" />
+                  Hạn chót
+                </div>
+                <input 
+                  type="date"
+                  value={editedTask.dueDate || ''}
+                  onChange={(e) => setEditedTask({...editedTask, dueDate: e.target.value})}
+                  className="w-full bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 text-sm font-medium rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer"
+                />
+              </div>
+
+              <div className="space-y-3">
+                <div className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                  <UserIcon className="w-4 h-4" />
+                  Người thực hiện
+                </div>
+                <select 
+                  value={editedTask.assigneeId || ''}
+                  onChange={(e) => setEditedTask({...editedTask, assigneeId: e.target.value})}
+                  className="w-full bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 text-sm font-medium rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer"
+                >
+                  <option value="">Chưa gán</option>
+                  {users.map(user => (
+                    <option key={user.id} value={user.id}>{user.name}</option>
+                  ))}
                 </select>
               </div>
             </div>

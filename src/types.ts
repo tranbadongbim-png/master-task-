@@ -7,6 +7,12 @@ export type Card = {
 export type TaskStatus = 'todo' | 'in_progress' | 'done';
 export type TaskPriority = 'low' | 'medium' | 'high';
 
+export type User = {
+  id: string;
+  name: string;
+  avatar: string;
+};
+
 export type Task = {
   id: string;
   cardId: string;
@@ -14,6 +20,8 @@ export type Task = {
   description: string;
   status: TaskStatus;
   priority?: TaskPriority;
+  dueDate?: string; // ISO string
+  assigneeId?: string;
   createdAt: number;
 };
 
