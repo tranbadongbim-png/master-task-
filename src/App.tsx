@@ -374,7 +374,7 @@ export default function App() {
             <div className="flex flex-col h-full">
               {/* Toolbar */}
               <div className="flex flex-col gap-4 mb-6 shrink-0">
-                <div className="flex flex-col sm:flex-row gap-4">
+                <div className="flex flex-row gap-2 sm:gap-4">
                   <div className="relative flex-1 max-w-md">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <input 
@@ -385,12 +385,12 @@ export default function App() {
                       className="w-full pl-9 pr-4 py-2 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-colors"
                     />
                   </div>
-                  <div className="flex items-center gap-2">
-                    <ArrowUpDown className="w-4 h-4 text-slate-400" />
+                  <div className="flex items-center gap-2 shrink-0">
+                    <ArrowUpDown className="w-4 h-4 text-slate-400 hidden sm:block" />
                     <select 
                       value={sortBy}
                       onChange={(e) => setSortBy(e.target.value as any)}
-                      className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer transition-colors"
+                      className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl px-2 sm:px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer transition-colors"
                     >
                       <option value="newest">Mới nhất</option>
                       <option value="oldest">Cũ nhất</option>
@@ -433,7 +433,7 @@ export default function App() {
                 </div>
               </div>
 
-              <div className={`flex flex-col md:flex-row gap-6 flex-1 items-start overflow-y-auto md:overflow-y-hidden pb-4 ${activeTab !== 'all' ? 'justify-center' : ''}`}>
+              <div className={`flex flex-row gap-4 md:gap-6 flex-1 items-start overflow-x-auto overflow-y-hidden pb-4 snap-x snap-mandatory ${activeTab !== 'all' ? 'justify-center' : ''}`}>
                 {(activeTab === 'all' || activeTab === 'todo') && (
                   <KanbanColumn 
                     title="Chưa làm" 
@@ -576,7 +576,7 @@ function KanbanColumn({ title, status, icon, tasks, onAddTask, onEditTask, onSta
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`flex-shrink-0 flex flex-col max-h-full rounded-2xl border transition-all duration-200 ${isFullWidth ? 'w-full max-w-5xl mx-auto' : 'w-full md:w-80'} ${isDragOver ? 'bg-indigo-50/80 dark:bg-indigo-900/30 border-indigo-400 dark:border-indigo-500 border-dashed shadow-inner ring-4 ring-indigo-400/10' : 'bg-slate-100/50 dark:bg-zinc-900/50 border-slate-200 dark:border-zinc-800'}`}
+      className={`flex-shrink-0 flex flex-col max-h-full rounded-2xl border transition-all duration-200 snap-start ${isFullWidth ? 'w-full max-w-5xl mx-auto' : 'w-[85vw] md:w-80'} ${isDragOver ? 'bg-indigo-50/80 dark:bg-indigo-900/30 border-indigo-400 dark:border-indigo-500 border-dashed shadow-inner ring-4 ring-indigo-400/10' : 'bg-slate-100/50 dark:bg-zinc-900/50 border-slate-200 dark:border-zinc-800'}`}
     >
       <div className={`p-4 flex items-center justify-between border-b transition-colors ${isDragOver ? 'border-indigo-200 dark:border-indigo-800/50' : 'border-slate-200 dark:border-zinc-800'}`}>
         <div className="flex items-center gap-2 font-semibold">
@@ -606,7 +606,11 @@ function KanbanColumn({ title, status, icon, tasks, onAddTask, onEditTask, onSta
                 layoutId={task.id}
                 key={task.id}
                 initial={{ opacity: 0, y: 15, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
+                animate={
+                  task.status === 'done' 
+                    ? { opacity: 0.65, y: 0, scale: [1, 1.05, 0.98], transition: { duration: 0.4 } }
+                    : { opacity: 1, y: 0, scale: 1 }
+                }
                 exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ duration: 0.2 }}
                 draggable
@@ -639,11 +643,14 @@ function KanbanColumn({ title, status, icon, tasks, onAddTask, onEditTask, onSta
                   <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500"></div>
                 )}
                 <div className="flex justify-between items-start mb-2 gap-2">
-                  <h3 className="font-medium text-sm group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors flex items-start gap-1.5">
+                  <h3 className={`font-medium text-sm transition-colors flex items-start gap-1.5 ${task.status === 'done' ? 'text-slate-500 dark:text-slate-400' : 'group-hover:text-indigo-600 dark:group-hover:text-indigo-400'}`}>
                     {task.status === 'in_progress' && (
                       <Clock className="w-4 h-4 text-blue-500 animate-pulse shrink-0 mt-0.5" />
                     )}
-                    <span className="leading-tight">{task.title}</span>
+                    {task.status === 'done' && (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                    )}
+                    <span className={`leading-tight ${task.status === 'done' ? 'line-through' : ''}`}>{task.title}</span>
                   </h3>
                   <select
                     value={task.status}
@@ -798,9 +805,80 @@ function TaskModal({ task, onClose, onSave, onDelete, subtasks, onAddSubtask, on
                   className="w-full min-h-[120px] p-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none resize-y text-sm"
                 />
               </div>
+
+              <div className="space-y-3 pt-4 border-t border-slate-200 dark:border-slate-800">
+                <div className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
+                  <CheckSquare className="w-4 h-4" />
+                  Công việc con
+                </div>
+                
+                <div className="space-y-2 max-h-[240px] overflow-y-auto pr-2 custom-scrollbar">
+                  <AnimatePresence>
+                    {subtasks.map(st => (
+                      <motion.div 
+                        layout
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.9 }}
+                        key={st.id} 
+                        className={`flex items-center gap-3 group bg-slate-50 dark:bg-slate-800/30 p-2 rounded-lg border transition-all ${st.isCompleted ? 'border-transparent opacity-60' : 'border-slate-100 dark:border-slate-800'}`}
+                      >
+                        <motion.button 
+                          whileTap={{ scale: 0.8 }}
+                          onClick={() => onUpdateSubtask(st.id, { isCompleted: !st.isCompleted })}
+                          className={`flex-shrink-0 w-5 h-5 rounded flex items-center justify-center border transition-colors ${st.isCompleted ? 'bg-indigo-500 border-indigo-500 text-white' : 'border-slate-300 dark:border-slate-600 hover:border-indigo-400'}`}
+                        >
+                          <AnimatePresence>
+                            {st.isCompleted && (
+                              <motion.div
+                                initial={{ scale: 0, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                exit={{ scale: 0, opacity: 0 }}
+                                transition={{ duration: 0.15 }}
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </motion.button>
+                        <input 
+                          type="text"
+                          value={st.title}
+                          onChange={(e) => onUpdateSubtask(st.id, { title: e.target.value })}
+                          className={`flex-1 min-w-0 bg-transparent border-none focus:ring-0 p-0 outline-none text-sm transition-all duration-300 truncate ${st.isCompleted ? 'text-slate-500 line-through' : 'text-slate-700 dark:text-slate-200'}`}
+                        />
+                        <button 
+                          onClick={() => onDeleteSubtask(st.id)}
+                          className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-red-500 transition-all"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                </div>
+
+                <form onSubmit={handleAddSubtask} className="flex flex-row gap-2 mt-3">
+                  <input 
+                    type="text"
+                    value={newSubtaskTitle}
+                    onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                    placeholder="Nhập tên việc con..."
+                    className="flex-1 bg-slate-100 dark:bg-zinc-800 border-none rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-colors"
+                  />
+                  <button 
+                    type="submit"
+                    disabled={!newSubtaskTitle.trim()}
+                    className="px-4 py-2 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-sm font-medium rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1 shrink-0"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Thêm
+                  </button>
+                </form>
+              </div>
             </div>
 
-            {/* Right Column: Status & Subtasks */}
+            {/* Right Column: Status & Priority */}
             <div className="space-y-6">
               <div className="space-y-3">
                 <div className="text-sm font-semibold text-slate-700 dark:text-slate-300">
@@ -830,77 +908,6 @@ function TaskModal({ task, onClose, onSave, onDelete, subtasks, onAddSubtask, on
                   <option value="medium">Trung bình</option>
                   <option value="high">Cao</option>
                 </select>
-              </div>
-
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
-                  <CheckSquare className="w-4 h-4" />
-                  Công việc con
-                </div>
-                
-                <div className="space-y-2">
-                  <AnimatePresence>
-                    {subtasks.map(st => (
-                      <motion.div 
-                        layout
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.9 }}
-                        key={st.id} 
-                        className="flex items-center gap-3 group bg-slate-50 dark:bg-slate-800/30 p-2 rounded-lg border border-slate-100 dark:border-slate-800"
-                      >
-                        <motion.button 
-                          whileTap={{ scale: 0.8 }}
-                          onClick={() => onUpdateSubtask(st.id, { isCompleted: !st.isCompleted })}
-                          className={`flex-shrink-0 w-5 h-5 rounded flex items-center justify-center border transition-colors ${st.isCompleted ? 'bg-indigo-500 border-indigo-500 text-white' : 'border-slate-300 dark:border-slate-600 hover:border-indigo-400'}`}
-                        >
-                          <AnimatePresence>
-                            {st.isCompleted && (
-                              <motion.div
-                                initial={{ scale: 0, opacity: 0 }}
-                                animate={{ scale: 1, opacity: 1 }}
-                                exit={{ scale: 0, opacity: 0 }}
-                                transition={{ duration: 0.15 }}
-                              >
-                                <Check className="w-3.5 h-3.5" />
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
-                        </motion.button>
-                        <input 
-                          type="text"
-                          value={st.title}
-                          onChange={(e) => onUpdateSubtask(st.id, { title: e.target.value })}
-                          className={`flex-1 bg-transparent border-none focus:ring-0 p-0 outline-none text-sm transition-all duration-300 ${st.isCompleted ? 'text-slate-400 line-through' : 'text-slate-700 dark:text-slate-200'}`}
-                        />
-                        <button 
-                          onClick={() => onDeleteSubtask(st.id)}
-                          className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-red-500 transition-all"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </motion.div>
-                    ))}
-                  </AnimatePresence>
-                </div>
-
-                <form onSubmit={handleAddSubtask} className="flex flex-col gap-2 mt-3">
-                  <input 
-                    type="text"
-                    value={newSubtaskTitle}
-                    onChange={(e) => setNewSubtaskTitle(e.target.value)}
-                    placeholder="Nhập tên việc con..."
-                    className="w-full bg-slate-100 dark:bg-zinc-800 border-none rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-colors"
-                  />
-                  <button 
-                    type="submit"
-                    disabled={!newSubtaskTitle.trim()}
-                    className="w-full px-3 py-2 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-sm font-medium rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Thêm việc con
-                  </button>
-                </form>
               </div>
             </div>
           </div>
