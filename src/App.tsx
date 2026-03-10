@@ -304,7 +304,7 @@ export default function App() {
           </button>
           
           <div className="mt-4 text-center text-[11px] text-slate-400 dark:text-slate-500 font-medium">
-            <p>&copy; {new Date().getFullYear()} TaskMaster</p>
+            <p>&copy; {new Date().getFullYear()} Master Task</p>
             <p className="mt-0.5">Design by Dong</p>
           </div>
         </div>
