@@ -89,29 +89,32 @@ app.post("/api/sync", async (req, res) => {
   try {
     const { cards, tasks, subtasks } = req.body;
     
-    const queries: { sql: string, params?: any[] }[] = [
+    // Execute DELETEs first to prevent race conditions with INSERTs
+    await queryD1([
       { sql: "DELETE FROM cards" },
       { sql: "DELETE FROM tasks" },
       { sql: "DELETE FROM subtasks" }
-    ];
+    ]);
+
+    const queries: { sql: string, params?: any[] }[] = [];
 
     for (const c of cards) {
       queries.push({ 
-        sql: "INSERT INTO cards (id, title, createdAt) VALUES (?, ?, ?)", 
+        sql: "INSERT OR REPLACE INTO cards (id, title, createdAt) VALUES (?, ?, ?)", 
         params: [c.id, c.title, c.createdAt] 
       });
     }
 
     for (const t of tasks) {
       queries.push({ 
-        sql: "INSERT INTO tasks (id, cardId, title, description, status, priority, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)", 
+        sql: "INSERT OR REPLACE INTO tasks (id, cardId, title, description, status, priority, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)", 
         params: [t.id, t.cardId, t.title, t.description || '', t.status, t.priority || null, t.createdAt] 
       });
     }
 
     for (const s of subtasks) {
       queries.push({ 
-        sql: "INSERT INTO subtasks (id, taskId, title, isCompleted, createdAt) VALUES (?, ?, ?, ?, ?)", 
+        sql: "INSERT OR REPLACE INTO subtasks (id, taskId, title, isCompleted, createdAt) VALUES (?, ?, ?, ?, ?)", 
         params: [s.id, s.taskId, s.title, s.isCompleted ? 1 : 0, s.createdAt] 
       });
     }

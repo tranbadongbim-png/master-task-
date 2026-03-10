@@ -19,21 +19,21 @@ export async function onRequestPost(context: any) {
 
     for (const c of cards) {
       statements.push(
-        db.prepare("INSERT INTO cards (id, title, createdAt) VALUES (?, ?, ?)")
+        db.prepare("INSERT OR REPLACE INTO cards (id, title, createdAt) VALUES (?, ?, ?)")
           .bind(c.id, c.title, c.createdAt)
       );
     }
 
     for (const t of tasks) {
       statements.push(
-        db.prepare("INSERT INTO tasks (id, cardId, title, description, status, priority, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)")
+        db.prepare("INSERT OR REPLACE INTO tasks (id, cardId, title, description, status, priority, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)")
           .bind(t.id, t.cardId, t.title, t.description || '', t.status, t.priority || null, t.createdAt)
       );
     }
 
     for (const s of subtasks) {
       statements.push(
-        db.prepare("INSERT INTO subtasks (id, taskId, title, isCompleted, createdAt) VALUES (?, ?, ?, ?, ?)")
+        db.prepare("INSERT OR REPLACE INTO subtasks (id, taskId, title, isCompleted, createdAt) VALUES (?, ?, ?, ?, ?)")
           .bind(s.id, s.taskId, s.title, s.isCompleted ? 1 : 0, s.createdAt)
       );
     }

@@ -302,6 +302,11 @@ export default function App() {
             <Settings className="w-5 h-5" />
             <span className="font-medium text-sm">Cài đặt</span>
           </button>
+          
+          <div className="mt-4 text-center text-[11px] text-slate-400 dark:text-slate-500 font-medium">
+            <p>&copy; {new Date().getFullYear()} TaskMaster</p>
+            <p className="mt-0.5">Design by Dong</p>
+          </div>
         </div>
       </motion.aside>
 
@@ -775,6 +780,10 @@ function TaskModal({ task, onClose, onSave, onDelete, subtasks, onAddSubtask, on
                   placeholder="Tên công việc"
                   className="w-full text-xl sm:text-2xl font-bold bg-transparent border-none focus:ring-0 p-0 placeholder-slate-300 dark:placeholder-slate-700 outline-none"
                 />
+                <div className="text-xs text-slate-400 mt-2 flex items-center gap-1">
+                  <Clock className="w-3.5 h-3.5" />
+                  Tạo lúc: {new Date(editedTask.createdAt).toLocaleString('vi-VN')}
+                </div>
               </div>
 
               <div className="space-y-3">
