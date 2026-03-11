@@ -9,8 +9,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from 'recharts';
 import { format, isPast, isToday, parseISO, addDays } from 'date-fns';
-import { Card, Task, Subtask, TaskStatus, TaskPriority, User } from './types';
-import { USERS } from './constants';
+import { Card, Task, Subtask, TaskStatus, TaskPriority } from './types';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { polyfill } from "mobile-drag-drop";
 import { scrollBehaviourDragImageTranslateOverride } from "mobile-drag-drop/scroll-behaviour";
@@ -25,76 +24,10 @@ polyfill({
 // Prevent scrolling while dragging
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
-const UserRow: React.FC<{ 
-  user: User, 
-  onUpdate: (id: string, updates: Partial<User>) => void, 
-  onDelete: (id: string) => void 
-}> = ({ user, onUpdate, onDelete }) => {
-  const [name, setName] = useState(user.name);
-  const isChanged = name !== user.name;
-
-  useEffect(() => {
-    setName(user.name);
-  }, [user.name]);
-
-  return (
-    <div className="p-4 flex items-center gap-4 group">
-      <div className="relative">
-        <img 
-          src={user.avatar} 
-          alt={user.name} 
-          className="w-12 h-12 rounded-full bg-slate-100 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700"
-          referrerPolicy="no-referrer"
-        />
-        <button 
-          onClick={() => {
-            const newSeed = Math.random();
-            onUpdate(user.id, { avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${newSeed}` });
-          }}
-          className="absolute -bottom-1 -right-1 p-1 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
-          title="Đổi avatar ngẫu nhiên"
-        >
-          <Edit2 className="w-3 h-3" />
-        </button>
-      </div>
-      
-      <div className="flex-1">
-        <div className="flex items-center gap-2">
-          <input 
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="flex-1 bg-transparent border-none focus:ring-0 p-0 font-medium text-slate-900 dark:text-white outline-none"
-            placeholder="Tên thành viên"
-          />
-          {isChanged && (
-            <button
-              onClick={() => onUpdate(user.id, { name })}
-              className="px-2 py-1 bg-indigo-600 text-white text-[10px] font-bold rounded-md hover:bg-indigo-700 transition-colors flex items-center gap-1"
-            >
-              <Check className="w-3 h-3" />
-              LƯU
-            </button>
-          )}
-        </div>
-        <div className="text-xs text-slate-500 mt-0.5">ID: {user.id}</div>
-      </div>
-
-      <button 
-        onClick={() => onDelete(user.id)}
-        className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-      >
-        <Trash2 className="w-5 h-5" />
-      </button>
-    </div>
-  );
-}
-
 export default function App() {
   const [cards, setCards] = useState<Card[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
-  const [users, setUsers] = useState<User[]>(USERS);
   const [activeCardId, setActiveCardId] = useLocalStorage<string | null>('taskmaster_active_card', null);
   const [isDarkMode, setIsDarkMode] = useLocalStorage<boolean>('taskmaster_theme', false);
   
@@ -111,7 +44,6 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'az' | 'za'>('newest');
   const [filterPriority, setFilterPriority] = useState<'all' | TaskPriority>('all');
-  const [filterAssignee, setFilterAssignee] = useState<string>('all');
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<'board' | 'settings' | 'analytics'>('board');
   const [activeTab, setActiveTab] = useState<'all' | TaskStatus>('all');
@@ -145,9 +77,6 @@ export default function App() {
         setCards(data.cards || []);
         setTasks(data.tasks || []);
         setSubtasks(data.subtasks || []);
-        if (data.users && data.users.length > 0) {
-          setUsers(data.users);
-        }
         setIsLoading(false);
         setInitialLoadDone(true);
       })
@@ -172,12 +101,12 @@ export default function App() {
       fetch('/api/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cards, tasks, subtasks, users })
+        body: JSON.stringify({ cards, tasks, subtasks })
       }).catch(err => console.error("Failed to sync data", err));
     }, 1000);
 
     return () => clearTimeout(timeout);
-  }, [cards, tasks, subtasks, users, isConfigured, initialLoadDone]);
+  }, [cards, tasks, subtasks, isConfigured, initialLoadDone]);
 
   const handleAddCard = (e: React.FormEvent) => {
     e.preventDefault();
@@ -242,8 +171,7 @@ export default function App() {
     .filter(t => 
       (t.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
       t.description.toLowerCase().includes(searchQuery.toLowerCase())) &&
-      (filterPriority === 'all' || t.priority === filterPriority) &&
-      (filterAssignee === 'all' || t.assigneeId === filterAssignee || (filterAssignee === 'unassigned' && !t.assigneeId))
+      (filterPriority === 'all' || t.priority === filterPriority)
     )
     .sort((a, b) => {
       if (sortBy === 'newest') return b.createdAt - a.createdAt;
@@ -264,32 +192,11 @@ export default function App() {
     );
   }
 
-  const handleAddUser = () => {
-    const newUser: User = {
-      id: generateId(),
-      name: 'Thành viên mới',
-      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${Math.random()}`
-    };
-    setUsers([...users, newUser]);
-  };
-
-  const handleUpdateUser = (id: string, updates: Partial<User>) => {
-    setUsers(users.map(u => u.id === id ? { ...u, ...updates } : u));
-  };
-
-  const handleDeleteUser = (id: string) => {
-    if (confirm('Bạn có chắc chắn muốn xóa thành viên này? Các công việc đã gán cho họ sẽ không còn người thực hiện.')) {
-      setUsers(users.filter(u => u.id !== id));
-      setTasks(tasks.map(t => t.assigneeId === id ? { ...t, assigneeId: undefined } : t));
-    }
-  };
-
   const handleBackup = () => {
     const data = {
       cards,
       tasks,
       subtasks,
-      users,
       version: '1.0',
       timestamp: Date.now()
     };
@@ -314,7 +221,7 @@ export default function App() {
         const data = JSON.parse(event.target?.result as string);
         
         // Basic validation
-        if (!data.cards || !data.tasks || !data.subtasks || !data.users) {
+        if (!data.cards || !data.tasks || !data.subtasks) {
           alert('Tệp sao lưu không hợp lệ hoặc bị hỏng.');
           return;
         }
@@ -323,7 +230,6 @@ export default function App() {
           setCards(data.cards);
           setTasks(data.tasks);
           setSubtasks(data.subtasks);
-          setUsers(data.users);
           
           if (data.cards.length > 0) {
             setActiveCardId(data.cards[0].id);
@@ -600,37 +506,6 @@ export default function App() {
               </section>
 
               <section className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Quản lý thành viên</h3>
-                  <button 
-                    onClick={handleAddUser}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Thêm thành viên
-                  </button>
-                </div>
-                
-                <div className="bg-white dark:bg-zinc-950 rounded-2xl border border-slate-200 dark:border-zinc-800 overflow-hidden shadow-sm">
-                  <div className="divide-y divide-slate-100 dark:divide-zinc-800">
-                    {users.map(user => (
-                      <UserRow 
-                        key={user.id} 
-                        user={user} 
-                        onUpdate={handleUpdateUser} 
-                        onDelete={handleDeleteUser} 
-                      />
-                    ))}
-                    {users.length === 0 && (
-                      <div className="p-8 text-center text-slate-500">
-                        Chưa có thành viên nào. Hãy thêm thành viên mới!
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </section>
-
-              <section className="space-y-4">
                 <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Dữ liệu</h3>
                 <div className="bg-white dark:bg-zinc-950 rounded-2xl border border-slate-200 dark:border-zinc-800 overflow-hidden shadow-sm">
                   <div className="p-6 space-y-6">
@@ -682,7 +557,7 @@ export default function App() {
             </div>
           </div>
         ) : activeView === 'analytics' ? (
-          <AnalyticsView cards={cards} tasks={tasks} users={users} />
+          <AnalyticsView cards={cards} tasks={tasks} />
         ) : (
           <div className="flex-1 overflow-x-auto overflow-y-hidden p-4 lg:p-8">
             {activeCard ? (
@@ -715,24 +590,6 @@ export default function App() {
                         <option value="high">Cao</option>
                         <option value="medium">Vừa</option>
                         <option value="low">Thấp</option>
-                      </select>
-                    </div>
-
-                    <div className="relative group">
-                      <div className="absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none">
-                        <UserIcon className="w-3.5 h-3.5 text-slate-400" />
-                      </div>
-                      <select 
-                        value={filterAssignee}
-                        onChange={(e) => setFilterAssignee(e.target.value)}
-                        className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl pl-7 pr-2 py-2 text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer transition-colors appearance-none min-w-[80px]"
-                        title="Lọc người thực hiện"
-                      >
-                        <option value="all">Tất cả</option>
-                        <option value="unassigned">Chưa gán</option>
-                        {users.map(user => (
-                          <option key={user.id} value={user.id}>{user.name}</option>
-                        ))}
                       </select>
                     </div>
 
@@ -788,7 +645,7 @@ export default function App() {
                 </div>
               </div>
 
-              <div className={`flex flex-row gap-4 md:gap-6 flex-1 items-start overflow-x-auto overflow-y-hidden pb-4 snap-x snap-mandatory ${activeTab !== 'all' ? 'justify-center' : ''}`}>
+              <div className={`flex flex-row gap-4 md:gap-6 flex-1 items-stretch overflow-x-auto overflow-y-hidden pb-4 snap-x snap-mandatory ${activeTab !== 'all' ? 'justify-center' : ''}`}>
                 {(activeTab === 'all' || activeTab === 'todo') && (
                   <KanbanColumn 
                     title="Chưa làm" 
@@ -801,7 +658,6 @@ export default function App() {
                     subtasks={subtasks}
                     draggedTaskId={draggedTaskId}
                     setDraggedTaskId={setDraggedTaskId}
-                    users={users}
                     isFullWidth={activeTab !== 'all'}
                   />
                 )}
@@ -817,7 +673,6 @@ export default function App() {
                     subtasks={subtasks}
                     draggedTaskId={draggedTaskId}
                     setDraggedTaskId={setDraggedTaskId}
-                    users={users}
                     isFullWidth={activeTab !== 'all'}
                   />
                 )}
@@ -833,7 +688,6 @@ export default function App() {
                     subtasks={subtasks}
                     draggedTaskId={draggedTaskId}
                     setDraggedTaskId={setDraggedTaskId}
-                    users={users}
                     isFullWidth={activeTab !== 'all'}
                   />
                 )}
@@ -873,7 +727,6 @@ export default function App() {
             onDeleteSubtask={(id) => {
               setSubtasks(subtasks.filter(st => st.id !== id));
             }}
-            users={users}
           />
         )}
       </AnimatePresence>
@@ -881,7 +734,7 @@ export default function App() {
   );
 }
 
-function AnalyticsView({ cards, tasks, users }: { cards: Card[], tasks: Task[], users: User[] }) {
+function AnalyticsView({ cards, tasks }: { cards: Card[], tasks: Task[] }) {
   const statsByCard = cards.map(card => {
     const cardTasks = tasks.filter(t => t.cardId === card.id);
     const total = cardTasks.length;
@@ -898,16 +751,6 @@ function AnalyticsView({ cards, tasks, users }: { cards: Card[], tasks: Task[], 
       completionRate: total > 0 ? Math.round((done / total) * 100) : 0
     };
   });
-
-  const statsByUser = users.map(user => {
-    const userTasks = tasks.filter(t => t.assigneeId === user.id);
-    return {
-      name: user.name,
-      total: userTasks.length,
-      done: userTasks.filter(t => t.status === 'done').length,
-      inProgress: userTasks.filter(t => t.status === 'in_progress').length,
-    };
-  }).filter(u => u.total > 0);
 
   const overallStats = [
     { name: 'Chưa làm', value: tasks.filter(t => t.status === 'todo').length, color: '#94a3b8' },
@@ -1073,39 +916,13 @@ function AnalyticsView({ cards, tasks, users }: { cards: Card[], tasks: Task[], 
               </ResponsiveContainer>
             </div>
           </div>
-
-          {statsByUser.length > 0 && (
-            <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-sm">
-              <h3 className="font-semibold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
-                <Users className="w-4 h-4 text-indigo-500" />
-                Khối lượng công việc theo thành viên
-              </h3>
-              <div className="h-80 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={statsByUser} layout="vertical" margin={{ top: 0, right: 30, left: 40, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" opacity={0.5} />
-                    <XAxis type="number" fontSize={11} tickLine={false} axisLine={false} tick={{ fill: '#64748b' }} />
-                    <YAxis dataKey="name" type="category" fontSize={11} tickLine={false} axisLine={false} tick={{ fill: '#64748b' }} width={80} />
-                    <Tooltip 
-                      cursor={{ fill: '#f1f5f9' }}
-                      contentStyle={{ backgroundColor: '#18181b', border: 'none', borderRadius: '12px', color: '#fff', fontSize: '12px' }}
-                      itemStyle={{ color: '#fff' }}
-                    />
-                    <Legend verticalAlign="top" align="right" height={36} iconType="circle" />
-                    <Bar dataKey="inProgress" name="Đang làm" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={20} />
-                    <Bar dataKey="done" name="Hoàn thành" fill="#10b981" radius={[0, 4, 4, 0]} barSize={20} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>
   );
 }
 
-function KanbanColumn({ title, status, icon, tasks, onAddTask, onEditTask, onStatusChange, subtasks, draggedTaskId, setDraggedTaskId, users, isFullWidth }: { 
+function KanbanColumn({ title, status, icon, tasks, onAddTask, onEditTask, onStatusChange, subtasks, draggedTaskId, setDraggedTaskId, isFullWidth }: { 
   title: string, 
   status: TaskStatus, 
   icon: React.ReactNode, 
@@ -1116,7 +933,6 @@ function KanbanColumn({ title, status, icon, tasks, onAddTask, onEditTask, onSta
   subtasks: Subtask[],
   draggedTaskId: string | null,
   setDraggedTaskId: (id: string | null) => void,
-  users: User[],
   isFullWidth?: boolean
 }) {
   const [isDragOver, setIsDragOver] = useState(false);
@@ -1160,7 +976,7 @@ function KanbanColumn({ title, status, icon, tasks, onAddTask, onEditTask, onSta
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`flex-shrink-0 flex flex-col max-h-full rounded-2xl border transition-all duration-200 snap-start ${isFullWidth ? 'w-full max-w-5xl mx-auto' : 'w-[85vw] md:w-80'} ${isDragOver ? 'bg-indigo-50/80 dark:bg-indigo-900/30 border-indigo-400 dark:border-indigo-500 border-dashed shadow-inner ring-4 ring-indigo-400/10' : 'bg-slate-100/50 dark:bg-zinc-900/50 border-slate-200 dark:border-zinc-800'}`}
+      className={`flex-shrink-0 flex flex-col h-full rounded-2xl border transition-all duration-200 snap-start ${isFullWidth ? 'w-full max-w-5xl mx-auto' : 'w-[85vw] md:w-80'} ${isDragOver ? 'bg-indigo-50/80 dark:bg-indigo-900/30 border-indigo-400 dark:border-indigo-500 border-dashed shadow-inner ring-4 ring-indigo-400/10' : 'bg-slate-100/50 dark:bg-zinc-900/50 border-slate-200 dark:border-zinc-800'}`}
     >
       <div className={`p-4 flex items-center justify-between border-b transition-colors ${isDragOver ? 'border-indigo-200 dark:border-indigo-800/50' : 'border-slate-200 dark:border-zinc-800'}`}>
         <div className="flex items-center gap-2 font-semibold">
@@ -1295,23 +1111,6 @@ function KanbanColumn({ title, status, icon, tasks, onAddTask, onEditTask, onSta
                       <span>{completedSubtasks}/{taskSubtasks.length}</span>
                     </div>
                   )}
-
-                  {task.assigneeId && (
-                    <div className="ml-auto flex -space-x-2">
-                      {(() => {
-                        const user = users.find(u => u.id === task.assigneeId);
-                        return user ? (
-                          <img 
-                            src={user.avatar} 
-                            alt={user.name} 
-                            title={user.name}
-                            className="w-6 h-6 rounded-full border-2 border-white dark:border-zinc-950 bg-slate-100"
-                            referrerPolicy="no-referrer"
-                          />
-                        ) : null;
-                      })()}
-                    </div>
-                  )}
                 </div>
               </motion.div>
             );
@@ -1335,7 +1134,7 @@ function KanbanColumn({ title, status, icon, tasks, onAddTask, onEditTask, onSta
   );
 }
 
-function TaskModal({ task, onClose, onSave, onDelete, subtasks, onAddSubtask, onUpdateSubtask, onDeleteSubtask, users }: {
+function TaskModal({ task, onClose, onSave, onDelete, subtasks, onAddSubtask, onUpdateSubtask, onDeleteSubtask }: {
   task: Task,
   onClose: () => void,
   onSave: (task: Task) => void,
@@ -1344,7 +1143,6 @@ function TaskModal({ task, onClose, onSave, onDelete, subtasks, onAddSubtask, on
   onAddSubtask: (title: string) => void,
   onUpdateSubtask: (id: string, updates: Partial<Subtask>) => void,
   onDeleteSubtask: (id: string) => void,
-  users: User[],
 }) {
   const [editedTask, setEditedTask] = useState(task);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
@@ -1538,23 +1336,6 @@ function TaskModal({ task, onClose, onSave, onDelete, subtasks, onAddSubtask, on
                   onChange={(e) => setEditedTask({...editedTask, dueDate: e.target.value})}
                   className="w-full bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 text-sm font-medium rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer"
                 />
-              </div>
-
-              <div className="space-y-3">
-                <div className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                  <UserIcon className="w-4 h-4" />
-                  Người thực hiện
-                </div>
-                <select 
-                  value={editedTask.assigneeId || ''}
-                  onChange={(e) => setEditedTask({...editedTask, assigneeId: e.target.value})}
-                  className="w-full bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 text-sm font-medium rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer"
-                >
-                  <option value="">Chưa gán</option>
-                  {users.map(user => (
-                    <option key={user.id} value={user.id}>{user.name}</option>
-                  ))}
-                </select>
               </div>
             </div>
           </div>
