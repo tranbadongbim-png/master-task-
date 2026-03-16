@@ -151,7 +151,7 @@ app.post("/api/sync", async (req, res) => {
       for (const u of users) {
         queries.push({ 
           sql: "INSERT OR REPLACE INTO users (id, name, avatar) VALUES (?, ?, ?)", 
-          params: [u.id, u.name, u.avatar] 
+          params: [u.id, u.name, u.avatar || null] 
         });
       }
     }

@@ -9,7 +9,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from 'recharts';
 import { format, isPast, isToday, parseISO, addDays } from 'date-fns';
-import { Card, Task, Subtask, TaskStatus, TaskPriority } from './types';
+import { Card, Task, Subtask, TaskStatus, TaskPriority, User } from './types';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { polyfill } from "mobile-drag-drop";
 import { scrollBehaviourDragImageTranslateOverride } from "mobile-drag-drop/scroll-behaviour";
@@ -28,6 +28,7 @@ export default function App() {
   const [cards, setCards] = useState<Card[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [activeCardId, setActiveCardId] = useLocalStorage<string | null>('taskmaster_active_card', null);
   const [isDarkMode, setIsDarkMode] = useLocalStorage<boolean>('taskmaster_theme', false);
   
@@ -77,6 +78,7 @@ export default function App() {
         setCards(data.cards || []);
         setTasks(data.tasks || []);
         setSubtasks(data.subtasks || []);
+        setUsers(data.users || []);
         setIsLoading(false);
         setInitialLoadDone(true);
       })
@@ -101,12 +103,12 @@ export default function App() {
       fetch('/api/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cards, tasks, subtasks })
+        body: JSON.stringify({ cards, tasks, subtasks, users })
       }).catch(err => console.error("Failed to sync data", err));
     }, 1000);
 
     return () => clearTimeout(timeout);
-  }, [cards, tasks, subtasks, isConfigured, initialLoadDone]);
+  }, [cards, tasks, subtasks, users, isConfigured, initialLoadDone]);
 
   const handleAddCard = (e: React.FormEvent) => {
     e.preventDefault();
@@ -197,6 +199,7 @@ export default function App() {
       cards,
       tasks,
       subtasks,
+      users,
       version: '1.0',
       timestamp: Date.now()
     };
@@ -230,6 +233,7 @@ export default function App() {
           setCards(data.cards);
           setTasks(data.tasks);
           setSubtasks(data.subtasks);
+          setUsers(data.users || []);
           
           if (data.cards.length > 0) {
             setActiveCardId(data.cards[0].id);
@@ -554,6 +558,92 @@ export default function App() {
                   </div>
                 </div>
               </section>
+
+              <section className="space-y-4">
+                <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Quản lý người dùng</h3>
+                <div className="bg-white dark:bg-zinc-950 rounded-2xl border border-slate-200 dark:border-zinc-800 overflow-hidden shadow-sm">
+                  <div className="p-6 space-y-6">
+                    <form 
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        const form = e.target as HTMLFormElement;
+                        const nameInput = form.elements.namedItem('userName') as HTMLInputElement;
+                        const avatarInput = form.elements.namedItem('userAvatar') as HTMLInputElement;
+                        const name = nameInput.value.trim();
+                        const avatar = avatarInput.value.trim();
+                        if (name) {
+                          setUsers([...users, { id: generateId(), name, avatar: avatar || undefined }]);
+                          nameInput.value = '';
+                          avatarInput.value = '';
+                        }
+                      }}
+                      className="flex flex-col gap-3"
+                    >
+                      <div className="flex gap-2">
+                        <input
+                          name="userName"
+                          type="text"
+                          placeholder="Tên người dùng mới..."
+                          className="flex-1 px-4 py-2 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm dark:text-white"
+                        />
+                        <button
+                          type="submit"
+                          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-xl transition-colors flex items-center gap-2 shrink-0"
+                        >
+                          <Plus className="w-4 h-4" />
+                          Thêm
+                        </button>
+                      </div>
+                      <input
+                        name="userAvatar"
+                        type="url"
+                        placeholder="URL ảnh đại diện (không bắt buộc)..."
+                        className="w-full px-4 py-2 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm dark:text-white"
+                      />
+                    </form>
+
+                    {users.length > 0 ? (
+                      <div className="space-y-2">
+                        {users.map(user => (
+                          <div key={user.id} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-zinc-900 rounded-xl border border-slate-100 dark:border-zinc-800">
+                            <div className="flex items-center gap-3">
+                              {user.avatar ? (
+                                <img 
+                                  src={user.avatar} 
+                                  alt="" 
+                                  className="w-8 h-8 rounded-full object-cover" 
+                                  referrerPolicy="no-referrer" 
+                                />
+                              ) : (
+                                <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-medium text-sm">
+                                  {user.name.charAt(0).toUpperCase()}
+                                </div>
+                              )}
+                              <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{user.name}</span>
+                            </div>
+                            <button
+                              onClick={() => {
+                                if (confirm(`Bạn có chắc muốn xóa người dùng "${user.name}"?`)) {
+                                  setUsers(users.filter(u => u.id !== user.id));
+                                  // Also remove assigneeId from tasks
+                                  setTasks(tasks.map(t => t.assigneeId === user.id ? { ...t, assigneeId: undefined } : t));
+                                }
+                              }}
+                              className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-slate-500 dark:text-slate-400 text-center py-4">
+                        Chưa có người dùng nào. Hãy thêm người dùng để giao việc.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </section>
             </div>
           </div>
         ) : activeView === 'analytics' ? (
@@ -665,6 +755,7 @@ export default function App() {
                     onEditTask={setEditingTask}
                     onStatusChange={handleStatusChange}
                     subtasks={subtasks}
+                    users={users}
                     draggedTaskId={draggedTaskId}
                     setDraggedTaskId={setDraggedTaskId}
                     isFullWidth={activeTab !== 'all'}
@@ -681,6 +772,7 @@ export default function App() {
                     onEditTask={setEditingTask}
                     onStatusChange={handleStatusChange}
                     subtasks={subtasks}
+                    users={users}
                     draggedTaskId={draggedTaskId}
                     setDraggedTaskId={setDraggedTaskId}
                     isFullWidth={activeTab !== 'all'}
@@ -697,6 +789,7 @@ export default function App() {
                     onEditTask={setEditingTask}
                     onStatusChange={handleStatusChange}
                     subtasks={subtasks}
+                    users={users}
                     draggedTaskId={draggedTaskId}
                     setDraggedTaskId={setDraggedTaskId}
                     isFullWidth={activeTab !== 'all'}
@@ -730,6 +823,7 @@ export default function App() {
               setEditingTask(null);
             }}
             subtasks={subtasks.filter(st => st.taskId === editingTask.id)}
+            users={users}
             onAddSubtask={(title) => {
               setSubtasks([...subtasks, { id: generateId(), taskId: editingTask.id, title, isCompleted: false, createdAt: Date.now() }]);
             }}
@@ -934,7 +1028,7 @@ function AnalyticsView({ cards, tasks }: { cards: Card[], tasks: Task[] }) {
   );
 }
 
-function KanbanColumn({ title, status, icon, tasks, onAddTask, onEditTask, onStatusChange, subtasks, draggedTaskId, setDraggedTaskId, isFullWidth, onHeaderClick }: { 
+function KanbanColumn({ title, status, icon, tasks, onAddTask, onEditTask, onStatusChange, subtasks, users, draggedTaskId, setDraggedTaskId, isFullWidth, onHeaderClick }: { 
   title: string, 
   status: TaskStatus, 
   icon: React.ReactNode, 
@@ -943,6 +1037,7 @@ function KanbanColumn({ title, status, icon, tasks, onAddTask, onEditTask, onSta
   onEditTask: (task: Task) => void,
   onStatusChange: (taskId: string, newStatus: TaskStatus) => void,
   subtasks: Subtask[],
+  users: User[],
   draggedTaskId: string | null,
   setDraggedTaskId: (id: string | null) => void,
   isFullWidth?: boolean,
@@ -1129,6 +1224,27 @@ function KanbanColumn({ title, status, icon, tasks, onAddTask, onEditTask, onSta
                       <span>{completedSubtasks}/{taskSubtasks.length}</span>
                     </div>
                   )}
+
+                  {task.assigneeId && users.find(u => u.id === task.assigneeId) && (
+                    <div 
+                      className="ml-auto flex items-center gap-1.5 text-[10px] font-medium text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-zinc-800 pl-1 pr-2 py-0.5 rounded-full"
+                      title={`Người thực hiện: ${users.find(u => u.id === task.assigneeId)?.name}`}
+                    >
+                      {users.find(u => u.id === task.assigneeId)?.avatar ? (
+                        <img 
+                          src={users.find(u => u.id === task.assigneeId)?.avatar} 
+                          alt="" 
+                          className="w-4 h-4 rounded-full object-cover" 
+                          referrerPolicy="no-referrer" 
+                        />
+                      ) : (
+                        <div className="w-4 h-4 rounded-full bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400 text-[8px] font-bold">
+                          {users.find(u => u.id === task.assigneeId)?.name.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <span className="truncate max-w-[80px]">{users.find(u => u.id === task.assigneeId)?.name}</span>
+                    </div>
+                  )}
                 </div>
               </motion.div>
             );
@@ -1152,18 +1268,20 @@ function KanbanColumn({ title, status, icon, tasks, onAddTask, onEditTask, onSta
   );
 }
 
-function TaskModal({ task, onClose, onSave, onDelete, subtasks, onAddSubtask, onUpdateSubtask, onDeleteSubtask }: {
+function TaskModal({ task, onClose, onSave, onDelete, subtasks, users, onAddSubtask, onUpdateSubtask, onDeleteSubtask }: {
   task: Task,
   onClose: () => void,
   onSave: (task: Task) => void,
   onDelete: (id: string) => void,
   subtasks: Subtask[],
+  users: User[],
   onAddSubtask: (title: string) => void,
   onUpdateSubtask: (id: string, updates: Partial<Subtask>) => void,
   onDeleteSubtask: (id: string) => void,
 }) {
   const [editedTask, setEditedTask] = useState(task);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
+  const [isAssigneeDropdownOpen, setIsAssigneeDropdownOpen] = useState(false);
 
   const handleSave = () => {
     onSave(editedTask);
@@ -1354,6 +1472,81 @@ function TaskModal({ task, onClose, onSave, onDelete, subtasks, onAddSubtask, on
                   onChange={(e) => setEditedTask({...editedTask, dueDate: e.target.value})}
                   className="w-full bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 text-sm font-medium rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer"
                 />
+              </div>
+
+              <div className="space-y-3">
+                <div className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                  <UserIcon className="w-4 h-4" />
+                  Người thực hiện
+                </div>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setIsAssigneeDropdownOpen(!isAssigneeDropdownOpen)}
+                    className="w-full bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 text-sm font-medium rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none flex items-center justify-between"
+                  >
+                    {editedTask.assigneeId && users.find(u => u.id === editedTask.assigneeId) ? (
+                      <div className="flex items-center gap-2">
+                        {users.find(u => u.id === editedTask.assigneeId)?.avatar ? (
+                          <img 
+                            src={users.find(u => u.id === editedTask.assigneeId)?.avatar} 
+                            alt="" 
+                            className="w-5 h-5 rounded-full object-cover" 
+                            referrerPolicy="no-referrer" 
+                          />
+                        ) : (
+                          <div className="w-5 h-5 rounded-full bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400 text-[10px] font-bold">
+                            {users.find(u => u.id === editedTask.assigneeId)?.name.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                        <span>{users.find(u => u.id === editedTask.assigneeId)?.name}</span>
+                      </div>
+                    ) : (
+                      <span className="text-slate-500">Chưa giao</span>
+                    )}
+                    <ArrowDown className="w-4 h-4 text-slate-400" />
+                  </button>
+                  
+                  {isAssigneeDropdownOpen && (
+                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl shadow-lg max-h-60 overflow-auto">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditedTask({...editedTask, assigneeId: undefined});
+                          setIsAssigneeDropdownOpen(false);
+                        }}
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-zinc-700/50 text-slate-700 dark:text-slate-300"
+                      >
+                        Chưa giao
+                      </button>
+                      {users.map(user => (
+                        <button
+                          key={user.id}
+                          type="button"
+                          onClick={() => {
+                            setEditedTask({...editedTask, assigneeId: user.id});
+                            setIsAssigneeDropdownOpen(false);
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-zinc-700/50 text-slate-700 dark:text-slate-300"
+                        >
+                          {user.avatar ? (
+                            <img 
+                              src={user.avatar} 
+                              alt="" 
+                              className="w-5 h-5 rounded-full object-cover" 
+                              referrerPolicy="no-referrer" 
+                            />
+                          ) : (
+                            <div className="w-5 h-5 rounded-full bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400 text-[10px] font-bold">
+                              {user.name.charAt(0).toUpperCase()}
+                            </div>
+                          )}
+                          <span>{user.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
