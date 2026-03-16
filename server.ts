@@ -19,25 +19,22 @@ async function queryD1(queries: { sql: string, params?: any[] }[]) {
     throw new Error("Cloudflare D1 credentials missing");
   }
 
-  // Use /batch endpoint for multiple queries in a single transaction
-  const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/d1/database/${dbId}/batch`;
+  // Use /query endpoint for both single and batch queries
+  const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/d1/database/${dbId}/query`;
   
   const results = [];
   
-  // Process in chunks of 50 (D1 batch limit is usually 100)
-  for (let i = 0; i < queries.length; i += 50) {
-    const chunk = queries.slice(i, i + 50).map(q => ({
-      sql: q.sql,
-      params: q.params || []
-    }));
-
+  for (const q of queries) {
     const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(chunk)
+      body: JSON.stringify({
+        sql: q.sql,
+        params: q.params || []
+      })
     });
     
     if (!response.ok) {
@@ -48,13 +45,19 @@ async function queryD1(queries: { sql: string, params?: any[] }[]) {
 
     const data = await response.json();
     if (!data.success) {
-      const errMsg = data.errors?.map((e: any) => e.message).join(", ") || "D1 batch query failed";
+      const errMsg = data.errors?.map((e: any) => e.message).join(", ") || "D1 query failed";
       console.error("D1 Error Details:", JSON.stringify(data.errors));
       throw new Error(errMsg);
     }
     
-    // data.result is an array of results for each query in the batch
-    results.push(...data.result);
+    // For a single query, data.result is usually an array with one element
+    // or the result object itself depending on the API version.
+    // Based on Cloudflare docs, it's an array of results.
+    if (Array.isArray(data.result)) {
+      results.push(data.result[0]);
+    } else {
+      results.push(data.result);
+    }
   }
   
   return results;
@@ -82,12 +85,15 @@ app.get("/api/data", async (req, res) => {
     ]);
 
     // Migration: Add dueDate and assigneeId if they don't exist
-    try {
+    const tableInfo = await queryD1([{ sql: "PRAGMA table_info(tasks)" }]);
+    const columns = tableInfo[0].results?.map((c: any) => c.name) || [];
+    
+    if (!columns.includes('dueDate')) {
       await queryD1([{ sql: "ALTER TABLE tasks ADD COLUMN dueDate TEXT" }]);
-    } catch (e) {}
-    try {
+    }
+    if (!columns.includes('assigneeId')) {
       await queryD1([{ sql: "ALTER TABLE tasks ADD COLUMN assigneeId TEXT" }]);
-    } catch (e) {}
+    }
 
     const results = await queryD1([
       { sql: "SELECT * FROM cards" },

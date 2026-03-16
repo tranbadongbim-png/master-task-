@@ -614,6 +614,15 @@ export default function App() {
 
                 {/* Tabs */}
                 <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                  {activeTab !== 'all' && (
+                    <button
+                      onClick={() => setActiveTab('all')}
+                      className="flex items-center gap-2 px-3 py-2 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-xl text-xs font-semibold hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-colors mr-2"
+                    >
+                      <ArrowLeft className="w-3.5 h-3.5" />
+                      Quay lại bảng
+                    </button>
+                  )}
                   <button
                     onClick={() => setActiveTab('all')}
                     title="Tất cả Kanban"
@@ -659,6 +668,7 @@ export default function App() {
                     draggedTaskId={draggedTaskId}
                     setDraggedTaskId={setDraggedTaskId}
                     isFullWidth={activeTab !== 'all'}
+                    onHeaderClick={() => setActiveTab('todo')}
                   />
                 )}
                 {(activeTab === 'all' || activeTab === 'in_progress') && (
@@ -674,6 +684,7 @@ export default function App() {
                     draggedTaskId={draggedTaskId}
                     setDraggedTaskId={setDraggedTaskId}
                     isFullWidth={activeTab !== 'all'}
+                    onHeaderClick={() => setActiveTab('in_progress')}
                   />
                 )}
                 {(activeTab === 'all' || activeTab === 'done') && (
@@ -689,6 +700,7 @@ export default function App() {
                     draggedTaskId={draggedTaskId}
                     setDraggedTaskId={setDraggedTaskId}
                     isFullWidth={activeTab !== 'all'}
+                    onHeaderClick={() => setActiveTab('done')}
                   />
                 )}
               </div>
@@ -922,7 +934,7 @@ function AnalyticsView({ cards, tasks }: { cards: Card[], tasks: Task[] }) {
   );
 }
 
-function KanbanColumn({ title, status, icon, tasks, onAddTask, onEditTask, onStatusChange, subtasks, draggedTaskId, setDraggedTaskId, isFullWidth }: { 
+function KanbanColumn({ title, status, icon, tasks, onAddTask, onEditTask, onStatusChange, subtasks, draggedTaskId, setDraggedTaskId, isFullWidth, onHeaderClick }: { 
   title: string, 
   status: TaskStatus, 
   icon: React.ReactNode, 
@@ -933,7 +945,8 @@ function KanbanColumn({ title, status, icon, tasks, onAddTask, onEditTask, onSta
   subtasks: Subtask[],
   draggedTaskId: string | null,
   setDraggedTaskId: (id: string | null) => void,
-  isFullWidth?: boolean
+  isFullWidth?: boolean,
+  onHeaderClick?: () => void
 }) {
   const [isDragOver, setIsDragOver] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -979,8 +992,13 @@ function KanbanColumn({ title, status, icon, tasks, onAddTask, onEditTask, onSta
       className={`flex-shrink-0 flex flex-col h-full rounded-2xl border transition-all duration-200 snap-start ${isFullWidth ? 'w-full max-w-5xl mx-auto' : 'w-[85vw] md:w-80'} ${isDragOver ? 'bg-indigo-50/80 dark:bg-indigo-900/30 border-indigo-400 dark:border-indigo-500 border-dashed shadow-inner ring-4 ring-indigo-400/10' : 'bg-slate-100/50 dark:bg-zinc-900/50 border-slate-200 dark:border-zinc-800'}`}
     >
       <div className={`p-4 flex items-center justify-between border-b transition-colors ${isDragOver ? 'border-indigo-200 dark:border-indigo-800/50' : 'border-slate-200 dark:border-zinc-800'}`}>
-        <div className="flex items-center gap-2 font-semibold">
-          {icon}
+        <div 
+          className="flex items-center gap-2 font-semibold cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors group/header"
+          onClick={onHeaderClick}
+        >
+          <div className="transition-transform group-hover/header:scale-110">
+            {icon}
+          </div>
           <span>{title}</span>
           <span className="bg-slate-200 dark:bg-slate-800 text-xs py-0.5 px-2 rounded-full ml-2">
             {tasks.length}
@@ -993,7 +1011,7 @@ function KanbanColumn({ title, status, icon, tasks, onAddTask, onEditTask, onSta
       
       <div 
         ref={scrollContainerRef}
-        className={`flex-1 overflow-y-auto p-3 ${isFullWidth ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 content-start' : 'flex flex-col gap-3'}`}
+        className={`flex-1 overflow-y-auto custom-scrollbar p-3 ${isFullWidth ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 content-start' : 'flex flex-col gap-3'}`}
       >
         <AnimatePresence>
           {tasks.map(task => {
